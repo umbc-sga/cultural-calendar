@@ -1,0 +1,133 @@
+<html>
+    <head>
+        <title>Cultural Calendar</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link href="fullcalendar/core/main.css" rel="stylesheet">
+        <link href="fullcalendar/daygrid/main.css" rel="stylesheet">
+        <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet">
+
+        <style>
+            #calendar_container { height: 90vh; }
+        </style>
+    </head>
+
+    <body>
+        <h1 class="text-center">
+            UMBC Cultural Calendar
+            <small id="loading">Loading...</small>
+        </h1>
+
+        <div id="calendar_container" class="container-fluid">
+            <div id="calendar"></div>
+        </div>
+
+        <script src="fullcalendar/core/main.min.js"></script>
+        <script src="fullcalendar/daygrid/main.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+        <script>
+            const DATE_ELEMENT = 0;
+            let events = [];
+
+            // create fullcalendar object
+            let calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+                plugins: [ "dayGrid" ],
+                defaultView: "dayGridMonth",
+                height: "parent",
+                eventRender: function (info) {
+                    $(info.el).tooltip({ title: info.event.title });     
+                }
+            });
+
+            // render calendar as empty when page loads
+            calendar.render();
+
+            let interval = setInterval(fetchCulturalEvents, 300);
+
+            let culturalOrgs = [
+                "umbcfasa", // Filipino-American Student Association
+                "umbcasa",  // African Student Association
+                "sua", // Arab Student Union
+                "themosaic", // The Mosaic Center
+                "umbchillel", // Hillel
+                "ascom", // Asian Studies Council of Majors
+                "bsu", // Black Student Union
+                "csc", // Carribean Students Council
+                "curlpwr", // CURL P.W.R
+                "degree-in-africana-studies", // Africana Studies
+                "umbccsa", // Chinese Students Association
+                "ekta", // EKTA - Indian Graduate Student Association
+                "eesa", // Ethiopian- Eritrean Student Association
+                "germanclub", // German Club
+                "hsa", // Hellenistic Student Association
+                "hsc", // Hindu Students Council
+                "hlsu", // Hispanic Latino Student Union
+                "umbc-jsa", // Japanese Student Association
+                "kdc", // K-Pop Dance Club
+                "lgbtqstudentunion", // LGBTQ Student Union
+                "nsa", // Nepali Student Association
+                "paksa", // Pakistani Student Association
+                "persianstudentassociation", // Persian Student Association
+                "russianclub", // Russian Club
+                "umbcsasa", // South Asian Student Association
+                "aslumbc", // Sign of Life
+                "spanishconversation", // Spanish Conversation Club
+                "umbcslsa", // Sri Lankan Students' Association
+                "umbcvsa" // Vietnamese Student Assocation
+            ];
+
+            function fetchCulturalEvents() {
+                // if still orgs to fetch
+                if (culturalOrgs.length) {
+                    let groupToken = culturalOrgs.shift();
+
+                    $.ajax({
+                        type: "POST",
+                        url: "events.php",
+                        data: { "group_token": groupToken },
+                        success: function(data) {
+                            // parse data as xml
+                            let parser = new DOMParser();
+                            let xmlDoc = parser.parseFromString(data, "text/xml");
+
+                            for (let event of xmlDoc.getElementsByTagName("Event")) {
+                                let eventTitle = event.getElementsByTagName("Title")[0].innerHTML;
+
+                                let start = new Date(event.getElementsByTagName("StartDate")[DATE_ELEMENT].innerHTML);
+                                let end = new Date(event.getElementsByTagName("EndDate")[DATE_ELEMENT].innerHTML);
+
+                                let groupName = event.getElementsByTagName("Group")[0].innerHTML;
+
+                                let eventSponsor = event.getElementsByTagName("Group")[0].getAttribute("token");
+
+                                // prevent event reposts
+                                if (event.getAttributeNode("url").value && eventSponsor == groupToken) {
+                                    let eventObj = {
+                                        "title": groupName + ": " + eventTitle,
+                                        "group": groupName,
+                                        "start": start,
+                                        "end": end
+                                    };
+
+                                    // prevent duplicate events on calendar
+                                    if (!events.includes(eventObj)) {
+                                        events.push(eventObj);
+
+                                        calendar.addEvent(eventObj);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                // if no more cultural orgs to fetch, stop the function interval
+                else {
+                    clearInterval(interval);
+                    document.getElementById("loading").innerHTML = "";
+                }
+            }
+        </script>
+    </body>
+</html>
